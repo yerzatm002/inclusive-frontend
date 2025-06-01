@@ -16,10 +16,6 @@ import AdminTasksPage from './pages/AdminTasksPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 
 
-
-
-
-
 export default function App() {
   const { mode } = useThemeMode();
   const theme = mode === 'dark' ? darkTheme : lightTheme;

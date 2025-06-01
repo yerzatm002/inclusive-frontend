@@ -19,9 +19,9 @@ const TaskDetailPage = () => {
     const { fontSize, fontFamily } = useFontSettings();
 
     const [task, setTask] = useState(null);
-    const [selectedOption, setSelectedOption] = useState(null);
+    const [selectedOptions, setSelectedOptions] = useState({});
     const [submitted, setSubmitted] = useState(false);
-    const [isCorrect, setIsCorrect] = useState(null);
+    const [correctAnswers, setCorrectAnswers] = useState({});
 
     useEffect(() => {
         api.getTaskById(id).then(setTask).catch(console.error);
@@ -29,30 +29,36 @@ const TaskDetailPage = () => {
 
     if (!task) return <Typography sx={{ mt: 4 }}>{t('loading')}...</Typography>;
 
-    const question = task.questions?.[0];
-
     const handleSubmit = () => {
-        if (selectedOption === null) return;
-        const correctIndex = question.correct;
-        const success = selectedOption === String(correctIndex);
-        setIsCorrect(success);
+        const results = {};
+        let correctCount = 0;
+        task.questions.forEach((q, idx) => {
+            const selected = selectedOptions[idx];
+            const isCorrect = selected === String(q.correct);
+            results[idx] = isCorrect;
+            if (isCorrect) correctCount++;
+        });
+
+        setCorrectAnswers(results);
         setSubmitted(true);
+
         const resultData = {
             taskId: task.id,
             subject: task.subject,
-            score: success ? 100 : 0,
-            correct: success,
+            score: Math.round((correctCount / task.questions.length) * 100),
+            correct: correctCount === task.questions.length,
             answeredAt: new Date().toISOString(),
-          };
-          
-          try {
+        };
+
+        try {
             const prev = JSON.parse(localStorage.getItem('results') || '[]');
             const updated = [...prev.filter(r => r.taskId !== task.id), resultData];
             localStorage.setItem('results', JSON.stringify(updated));
-          } catch (e) {
+        } catch (e) {
             console.error('❌ Failed to save result in localStorage:', e);
-          }
-        api.createResult({ taskId: task.id, score: success ? 100 : 0 });
+        }
+
+        api.createResult({ taskId: task.id, score: resultData.score });
     };
 
     return (
@@ -88,27 +94,27 @@ const TaskDetailPage = () => {
                 </CardContent>
             </Card>
 
-            {question && (
-                <Paper sx={{ mt: 4, p: 3, backgroundColor: mode === 'dark' ? '#2a2a2a' : '#fafafa' }}>
+            {task.questions.map((question, idx) => (
+                <Paper key={idx} sx={{ mt: 4, p: 3, backgroundColor: mode === 'dark' ? '#2a2a2a' : '#fafafa' }}>
                     <Typography variant="h6" sx={{ fontFamily: fontFamilies[fontFamily], fontSize }}>
                         {question.question}
                     </Typography>
                     <SpeechToggle text={question.question} />
 
                     <RadioGroup
-                        value={selectedOption}
-                        onChange={(e) => setSelectedOption(e.target.value)}
+                        value={selectedOptions[idx] || ''}
+                        onChange={(e) => setSelectedOptions({ ...selectedOptions, [idx]: e.target.value })}
                         sx={{ mt: 2 }}
                     >
-                        {question.options.map((opt, idx) => {
-                            const isSelected = selectedOption === String(idx);
-                            const isAnswer = submitted && idx === question.correct;
-                            const isWrongSelected = submitted && isSelected && idx !== question.correct;
+                        {question.options.map((opt, i) => {
+                            const isSelected = selectedOptions[idx] === String(i);
+                            const isAnswer = submitted && i === question.correct;
+                            const isWrongSelected = submitted && isSelected && i !== question.correct;
 
                             return (
-                                <Box key={idx} display="flex" alignItems="center" gap={1} my={0.5}>
+                                <Box key={i} display="flex" alignItems="center" gap={1} my={0.5}>
                                     <FormControlLabel
-                                        value={String(idx)}
+                                        value={String(i)}
                                         control={<Radio disabled={submitted} />}
                                         label={
                                             <Typography
@@ -129,29 +135,31 @@ const TaskDetailPage = () => {
                         })}
                     </RadioGroup>
 
-                    {!submitted ? (
-                        <Button
-                            onClick={handleSubmit}
-                            variant="contained"
-                            color="primary"
-                            sx={{ mt: 3 }}
-                            disabled={selectedOption === null}
-                        >
-                            {t('submit')}
-                        </Button>
-                    ) : (
+                    {submitted && (
                         <Typography
                             sx={{
-                                mt: 3,
+                                mt: 2,
                                 fontSize,
                                 fontFamily: fontFamilies[fontFamily],
-                                color: isCorrect ? 'green' : 'red',
+                                color: correctAnswers[idx] ? 'green' : 'red',
                             }}
                         >
-                            {isCorrect ? t('correct') : t('incorrect')}
+                            {correctAnswers[idx] ? t('correct') : t('incorrect')}
                         </Typography>
                     )}
                 </Paper>
+            ))}
+
+            {!submitted && (
+                <Button
+                    onClick={handleSubmit}
+                    variant="contained"
+                    color="primary"
+                    sx={{ mt: 4 }}
+                    disabled={Object.keys(selectedOptions).length !== task.questions.length}
+                >
+                    {t('submit')}
+                </Button>
             )}
         </Container>
     );

@@ -1,4 +1,5 @@
-const BASE_URL = 'https://inclusive-backend.onrender.com/api';
+// const BASE_URL = 'https://inclusive-backend.onrender.com/api';
+const BASE_URL = 'http://localhost:3000/api';
 
 const getToken = () => localStorage.getItem('token');
 
